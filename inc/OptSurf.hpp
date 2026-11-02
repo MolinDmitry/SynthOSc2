@@ -23,7 +23,7 @@ class OptSurf{
         void setR(double R);
         void setGlass(std::string glass);
         void setT(double t);
-        Ray* PassRayThrougtSurface(Ray* ray, double n0, double n1);
+        Ray PassRayThrougtSurface(Ray ray, double n0, double n1);
 };
 
 OptSurf::OptSurf(){
@@ -77,23 +77,30 @@ OptSurf::OptSurf(){
        this->t = t;
     }
     
-    Ray* OptSurf::PassRayThrougtSurface(Ray* ray, double n0, double n1){
-        Ray* outRay = nullptr;
+    Ray OptSurf::PassRayThrougtSurface(Ray ray, double n0, double n1){
+        Ray outRay = Ray();
         if (fabs(this->R) > 0.01){                                           // радиус не нулевой
-            double D = this->R*this->R - ray->getH()*ray->getH();
+            double D = this->R*this->R - ray.getH()*ray.getH();
             if (D < 0) return outRay;                                       //выходной луч не существует
             double xA = this->R - (this->R>=0 ? 1: -1)*sqrt(D);             //абсцисса точки пересечения луча и поверхности
             double denom = 1-xA/this->R;
-            if (fabs(denom)<1e-14) return new Ray(ray->getH(),ray->getW());  // луч проходит по касательной, не преломляясь
-            double bn = ray->getH()/(denom);                                // параметр нормали к окружности в точке падения луча
+            if (fabs(denom)<1e-14){
+                outRay.setH(ray.getH());
+                outRay.setW(ray.getW());
+                outRay.setExist();
+                return outRay;  // луч проходит по касательной, не преломляясь
+            }
+            double bn = ray.getH()/(denom);                                // параметр нормали к окружности в точке падения луча
             double kn = -1*bn/this->R;                                      // параметр нормали к окружности в точке падения луча
-            double fi = ray->getW() - atan(kn);                             //угол между нормалью и падающим лучом
+            double fi = ray.getW() - atan(kn);                             //угол между нормалью и падающим лучом
             if (fabs(fi) > M_PI/2) return outRay;                           // выходной луч не существует
             double sin_out_ray = n0*sin(fi)/n1;
             if (sin_out_ray > 1.0) return outRay;                           //полное внутреннее отражение
             double fi1 = asin(sin_out_ray);                                 //угол луча к нормали после преломления
-            double w1 = atan(kn) +fi1;                                      //угол луча к ОО после преломления
-            outRay = new Ray(ray->getH(),w1);
+            double w1 = atan(kn) + fi1;                                     //угол луча к ОО после преломления
+            outRay.setH(ray.getH());
+            outRay.setW(w1);
+            outRay.setExist();
         }
         return outRay;
     }
