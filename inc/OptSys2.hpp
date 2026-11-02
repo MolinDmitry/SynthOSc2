@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include <cmath>
+#include <string>
 #include "Ray.hpp"
 #include "GlassLib.hpp"
 #include "GOST_GlassLib.hpp"
@@ -29,7 +30,7 @@ class OptSystem{
         OptSystem(
             double aperture, 
             double field, 
-            double wavelengths[NUM_WAVELENGTHS],
+            double* wavelengths,
             int wavelengthsCount, 
             GlassLib* glassLib
         );
@@ -37,9 +38,10 @@ class OptSystem{
         double getField();
         void appendSurface(OptSurf* optSurf);
         void printOptSystem();
-        Ray passRayThroughtOS(Ray ray, int wvlInd, bool thinComp);
-        double findRMSSpotRadius(int wvlInd, double FOV, bool thinComp, int numRays); // FOV - угол отклоненияч луча в градусах 
+        Ray passRayThroughtOS(Ray ray, int wvlIndex, bool thinComp);
+        double findSpotRadius(int wvlIndexex, double FOV_deg, bool RMS, bool thinComp, int numRays); // FOV - угол отклоненияч луча в градусах 
                                                                                     // NumRays - число лучей по высоте входного зрачка
+        double findRearFocalLength(int wvlIndex, int thinComp);
         OptSystem cloneOptSystem();
 };
 
@@ -51,11 +53,11 @@ class OptSystem{
         }
         this->wavelengthsCount = 0;
         for(int i = 0; i < MAX_NUM_SURF; i++){
-            surfaceArray[MAX_NUM_SURF] = OptSurf(0, 0, "");
+            surfaceArray[i] = OptSurf(0, 0, "");
         }
         this->surfaceCount = 0;
         this->glassLib = nullptr;
-        for(int i = 0; i < NUM_WAVELENGTHS;i++){
+        for(int i = 0; i < REF_IND_SIZE;i++){
             this->refIndArray[i] = 1.0;
         }
 
@@ -64,21 +66,21 @@ class OptSystem{
     OptSystem::OptSystem(
             double aperture, 
             double field, 
-            double wavelengths[NUM_WAVELENGTHS], 
+            double* wavelengths, 
             int wavelengthsCount, 
             GlassLib* glassLib) {
         this->aperture = aperture;
         this->field = field;
-        for(int i =0; i< NUM_WAVELENGTHS; i++){
-             this->wavelengthsArray[i] = wavelengths[i];
-        }
         this->wavelengthsCount = wavelengthsCount;
+        for(int i =0; i< wavelengthsCount; i++){
+             this->wavelengthsArray[i] = wavelengths[i];
+        }        
         for(int i = 0; i < MAX_NUM_SURF; i++){
-            surfaceArray[MAX_NUM_SURF] = OptSurf(0, 0, "");
+            surfaceArray[i] = OptSurf(0, 0, "NONE");
         }
         this->surfaceCount = 0;
         this->glassLib = glassLib;
-        for(int i = 0; i<NUM_WAVELENGTHS;i++){
+        for(int i = 0; i < REF_IND_SIZE;i++){
             this->refIndArray[i] = 1.0;
         }
     }
@@ -106,26 +108,37 @@ class OptSystem{
     }
 
     void OptSystem::printOptSystem(){
-        std::cout << "Aperture: " << this->aperture <<std::endl;
-        std::cout << "Field: " << this->field <<std::endl;
+        std::cout << std::endl;
+        std::cout << "=======================================================================" <<std::endl;
+        std::cout << "Optical system data: " <<std::endl;
+        std::cout << "Aperture: " << this->aperture << " mm" <<std::endl;
+        std::cout << "Field (2w): " << 2*this->field << " deg" << std::endl;
         for(int i = 0; i<this->wavelengthsCount; i++){
-            std::cout << "wavelength " << i << ": " << this->wavelengthsArray[i] <<std::endl;
+            std::cout << "wavelength " << i << ": " << this->wavelengthsArray[i] << " um" <<std::endl;
         }
-        for(int i = 0; i<this->surfaceCount; i++){
-            this->surfaceArray[i].printOptSurf();     
+        if (this->surfaceCount == 0){
+            std::cout << "There are no optical surfaces " <<std::endl;
         }
-
+        else{
+            for(int i = 0; i<this->surfaceCount; i++){
+                this->surfaceArray[i].printOptSurf();     
+            }
+        }
+        
+        std::cout << "=======================================================================" <<std::endl;
         }
     
-    Ray OptSystem::passRayThroughtOS(Ray ray, int wvlInd, bool thinComp){
+    Ray OptSystem::passRayThroughtOS(Ray ray, int wvlIndex, bool thinComp){
         Ray outRay = Ray(); // создаем луч с признаком не существования
         Ray inRay = Ray(ray.getH(),ray.getW());
-        for(int i = 0; i < this->surfaceCount;i++){
+        for(int i = 0; i < this->surfaceCount; i++){
             // находим луч после прохождения каждой поверхности
+            double n0 = 1;
+            if (i > 0) n0 = this->refIndArray[(i-1)*this->wavelengthsCount + wvlIndex];
             outRay = this->surfaceArray[i].PassRayThrougtSurface(
                 inRay,
-                this->refIndArray[i*this->wavelengthsCount + wvlInd],
-                this->refIndArray[(i+1)*this->wavelengthsCount + wvlInd]
+                n0,
+                this->refIndArray[i*this->wavelengthsCount + wvlIndex]
             );
             if (outRay.isExist()){
                 double nextH = outRay.getH(); // для тонкого компонента высота на следующей поверхности не меняется 
@@ -143,9 +156,10 @@ class OptSystem{
     }
 
         /**
-         * @brief Вычисление среднеквадратического значения радиуса пятна рассеяния в фокальной плоскости
+         * @brief Вычисление значения радиуса пятна рассеяния в фокальной плоскости
          * @param wvlInd - индекс длины волны в векторе длин волн
-         * @param FOV - угол отклонения луча в градусах
+         * @param FOV_deg - угол отклонения луча в градусах
+         * @param RMS - true - сренеквадратический радиус, false - геометрический радиус
          * @param thinComp - флаг расчета для оптической системы из тонких компонентов
          * @param numRays - число лучей для расчета по высоте входного зрачка
          * @return Среднеквадратическое значение радиуса пятна рассяения в фокальной плоскости
@@ -158,52 +172,78 @@ class OptSystem{
          *          - вычисляем RMS радиус пятна относительно точки пересечения наклонного нулевого луча с фокальной плоскостью
          * 
          */
-        double OptSystem::findRMSSpotRadius(int wvlInd, double FOV, bool thinComp, int numRays){
-            if (numRays <= 1) return 0.0;
-            if (numRays%2 != 0) numRays++; // для расчета по четному числу чтобы луч не проходил по центру зрачка
-            // т.е. пятно от него будет 0, а в общем количестве он учитывается, уменьшая RMS при малых количествах лучей
-            // вычисляем положение фокальной плоскости
-            Ray ray = Ray(1e-7, 0.0); // нулевой луч
-            Ray outRay = this->passRayThroughtOS(ray, wvlInd, thinComp);
-            if (!outRay.isExist()) return 1e+15;
-            if (fabs(outRay.getW())<1e-15) // фокальная плоскость в бесконечности
-                return 1e+15;
-            double xFplane = -1*outRay.getH()/tan(outRay.getW()); // координата фокальной плоскости относительно последней поверхности
-            double curField = FOV*M_PI/180;
-            ray = Ray(1e-7, curField);
-            outRay = this->passRayThroughtOS(ray,wvlInd,thinComp);
-            if (!outRay.isExist()) return 1e+15;
-            double lastR = this->surfaceArray[this->surfaceCount-1].getR();
-            double dX = fabs(lastR) - sqrt(lastR*lastR - outRay.getH()*outRay.getH());
-            double xf = xFplane - dX*(lastR >= 0 ? 1:-1); // координата фокальной плоскости в системе координат, связанной с точкой выхода луча после последней поверхности
-            double y0 = outRay.getH() + xf*tan(outRay.getW()); //высота нулевого луча на пересечении с фокальной плоскостью            
-            double da = this->aperture/(numRays-1);
-            double RMSRadius = 0;
+    double OptSystem::findSpotRadius(int wvlIndex, double FOV_deg, bool RMS, bool thinComp, int numRays){
+        if (numRays <= 1) return 0.0;
+        if (numRays%2 != 0) numRays++; // для расчета по четному числу чтобы луч не проходил по центру зрачка
+        // т.е. пятно от него будет 0, а в общем количестве он учитывается, уменьшая RMS при малых количествах лучей
+        // вычисляем положение фокальной плоскости
+        Ray ray = Ray(1e-7, 0.0); // нулевой луч
+        Ray outRay = this->passRayThroughtOS(ray, wvlIndex, thinComp);
+        if (!outRay.isExist()) return 1e+15;
+        if (fabs(outRay.getW())<1e-15) // фокальная плоскость в бесконечности
+            return 1e+15;
+        double xFplane = -1*outRay.getH()/tan(outRay.getW()); // координата фокальной плоскости относительно последней поверхности
+        double curField = FOV_deg*M_PI/180;
+        ray = Ray(1e-7, curField);
+        outRay = this->passRayThroughtOS(ray, wvlIndex, thinComp);
+        if (!outRay.isExist()) return 1e+15;
+        double lastR = this->surfaceArray[this->surfaceCount-1].getR();
+        double dX = fabs(lastR) - sqrt(lastR*lastR - outRay.getH()*outRay.getH());
+        double xf = xFplane - dX*(lastR >= 0 ? 1:-1); // координата фокальной плоскости в системе координат, связанной с точкой выхода луча после последней поверхности
+        double y0 = outRay.getH() + xf*tan(outRay.getW()); //высота нулевого луча на пересечении с фокальной плоскостью            
+        double da = this->aperture/(numRays-1);
+        double radius = 0;
+        double curH = 0;
+        if (RMS){
             int numPassedRays = 0;
-            for(int i = 0;i < numRays;i++){
-                double curH = i*da - this->aperture/2;
+            for(int i = 0; i < numRays;i++){
+                curH = i*da - this->aperture/2;
                 ray = Ray(curH, curField);
-                outRay = this->passRayThroughtOS(ray,wvlInd,thinComp);
+                outRay = this->passRayThroughtOS(ray, wvlIndex, thinComp);
                 if (outRay.isExist()){
                     double lastR = this->surfaceArray[this->surfaceCount-1].getR();
                     double dX = fabs(lastR) - sqrt(lastR*lastR - outRay.getH()*outRay.getH());
                     double xf = xFplane - dX*(lastR>=0 ? 1:-1);// координата фокальной плоскости в системе координат, связанной с точкой выхода луча после последней поверхности
                     double dy = outRay.getH() + xf*tan(outRay.getW()) - y0;
                     numPassedRays++;
-                    RMSRadius+=dy*dy;
+                    radius+=dy*dy;
                 }
             }
-            RMSRadius = sqrt(RMSRadius/numPassedRays);
-            return RMSRadius;
+            radius = sqrt(radius/numPassedRays);
         }
+        else{
+            curH = this->aperture/2;
+            ray = Ray(curH, curField);
+            outRay = this->passRayThroughtOS(ray, wvlIndex, thinComp);
+            if (outRay.isExist()){
+                    double lastR = this->surfaceArray[this->surfaceCount-1].getR();
+                    double dX = fabs(lastR) - sqrt(lastR*lastR - outRay.getH()*outRay.getH());
+                    double xf = xFplane - dX*(lastR>=0 ? 1:-1);// координата фокальной плоскости в системе координат, связанной с точкой выхода луча после последней поверхности
+                    double dy = outRay.getH() + xf*tan(outRay.getW()) - y0;
+                    radius =fabs(dy);
+                }
+        }        
+        return radius;
+    }
+
+    /**
+     * @brief возвращает значение заднего фокусного расстояния ОС
+     * 
+     */
+
+    double OptSystem::findRearFocalLength(int wvlIndex, int thinComp){
+        Ray inputRay = Ray(1e-7, 0);
+        Ray outputRay = this->passRayThroughtOS(inputRay, wvlIndex, thinComp);
+        return -1*inputRay.getH()/tan(outputRay.getW());
+    }
 
     
 
 //==============================================================================================================
- OptSystem OptSystem::cloneOptSystem(){
-    OptSystem clonedOptSys = OptSystem(this->aperture,this->field, this->wavelengthsArray, this->wavelengthsCount, this->glassLib);
-    for(int i = 0; i<this->surfaceCount; i++){
-        clonedOptSys.appendSurface(&this->surfaceArray[i]);
+    OptSystem OptSystem::cloneOptSystem(){
+        OptSystem clonedOptSys = OptSystem(this->aperture,this->field, this->wavelengthsArray, this->wavelengthsCount, this->glassLib);
+        for(int i = 0; i < this->surfaceCount; i++){
+            clonedOptSys.appendSurface(&this->surfaceArray[i]);
+        }
+        return clonedOptSys;
     }
-    return clonedOptSys;
- }

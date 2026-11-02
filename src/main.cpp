@@ -2,6 +2,13 @@
 #include <string>
 #include <fstream>
 
+#include "../tests/test01.hpp"
+
+#include "../inc/Ray.hpp"
+#include "../inc/GOST_GlassLib.hpp"
+#include "../inc/OptSurf.hpp"
+#include "../inc/OptSys2.hpp"
+
 
 
 void log(std::string str){
@@ -25,7 +32,6 @@ int main(int argc, char* argv[]){
     inputStream.close();
 
 
-
-
+    test01::test01();
     return 0;
 }

@@ -36,6 +36,8 @@ GOST_GlassLib::GOST_GlassLib()
     double GOST_GlassLib::getRefIndex(std::string glassName, double wavelength) const
     {
         double refInd = -1;
+        if (glassName=="")      refInd = this->refIndModel(1.0, 1.0, wavelength);
+        if (glassName=="AIR")   refInd = this->refIndModel(1.0, 1.0, wavelength);
         if (glassName=="Air")   refInd = this->refIndModel(1.0, 1.0, wavelength);
         if (glassName=="K8")    refInd = this->refIndModel(1.5183, 63.83, wavelength);
         if (glassName=="LK6")   refInd = this->refIndModel(1.4721, 66.68, wavelength);
