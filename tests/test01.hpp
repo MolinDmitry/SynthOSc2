@@ -28,6 +28,14 @@ namespace test01 {
     optSurf.setT(0);
     optSurf.setGlass("Air");
     optSys.appendSurface(&optSurf);
+    // optSurf.setR(200);
+    // optSurf.setT(5);
+    // optSurf.setGlass("F1");
+    // optSys.appendSurface(&optSurf);
+    // optSurf.setR(-200);
+    // optSurf.setT(0);
+    // optSurf.setGlass("Air");
+    // optSys.appendSurface(&optSurf);
     test01::log("Optical system:");
     optSys.printOptSystem();
     
@@ -54,8 +62,8 @@ namespace test01 {
     double dy = dx*tan(outputRay.getW());
     log("dy: " + std::to_string(dy));
     log("");
-    double geo_spot_radius = optSys.findSpotRadius(1, 0, false, USE_THIN_COMP, 10);
-    double rms_spot_radius = optSys.findSpotRadius(1, 0 , true, USE_THIN_COMP, 10);
+    double geo_spot_radius = optSys.findSpotRadius(1, 5, false, USE_THIN_COMP, 6);
+    double rms_spot_radius = optSys.findSpotRadius(1, 5 , true, USE_THIN_COMP, 6);
     log("GEO spot radius: " + std::to_string(geo_spot_radius));
     log("RMS spot radius: " + std::to_string(rms_spot_radius)); 
 
