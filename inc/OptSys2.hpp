@@ -192,7 +192,7 @@ class OptSystem{
         double xf = xFplane - dX*(lastR >= 0 ? 1:-1); // координата фокальной плоскости в системе координат, связанной с точкой выхода луча после последней поверхности
         double y0 = outRay.getH() + xf*tan(outRay.getW()); //высота нулевого луча на пересечении с фокальной плоскостью            
         double da = this->aperture/(numRays-1);
-        double radius = 0;
+        double radius = 1e+6;
         double curH = 0;
         if (RMS){
             int numPassedRays = 0;
@@ -212,16 +212,33 @@ class OptSystem{
             radius = sqrt(radius/numPassedRays);
         }
         else{
+            double dy1 = 1e+6;
+            double dy2 = 1e+6;
             curH = this->aperture/2;
             ray = Ray(curH, curField);
             outRay = this->passRayThroughtOS(ray, wvlIndex, thinComp);
-            if (outRay.isExist()){
+            int ray1Exist = outRay.isExist();
+            if (ray1Exist){
                     double lastR = this->surfaceArray[this->surfaceCount-1].getR();
                     double dX = fabs(lastR) - sqrt(lastR*lastR - outRay.getH()*outRay.getH());
-                    double xf = xFplane - dX*(lastR>=0 ? 1:-1);// координата фокальной плоскости в системе координат, связанной с точкой выхода луча после последней поверхности
-                    double dy = outRay.getH() + xf*tan(outRay.getW()) - y0;
-                    radius =fabs(dy);
+                    double xf = xFplane - dX*(lastR >= 0 ? 1:-1);// координата фокальной плоскости в системе координат, связанной с точкой выхода луча после последней поверхности
+                    dy1 = outRay.getH() + xf*tan(outRay.getW());
+                    //radius =fabs(dy);
                 }
+            curH = -1*this->aperture/2;
+            ray = Ray(curH, curField);
+            outRay = this->passRayThroughtOS(ray, wvlIndex, thinComp);
+            int ray2Exist = outRay.isExist();
+            if (ray2Exist){
+                    double lastR = this->surfaceArray[this->surfaceCount-1].getR();
+                    double dX = fabs(lastR) - sqrt(lastR*lastR - outRay.getH()*outRay.getH());
+                    double xf = xFplane - dX*(lastR >= 0 ? 1:-1);// координата фокальной плоскости в системе координат, связанной с точкой выхода луча после последней поверхности
+                    dy2 = outRay.getH() + xf*tan(outRay.getW());
+                    //radius =fabs(dy);
+                }
+            if (ray1Exist && ray2Exist){
+                radius = fabs(dy1-dy2)/2;
+            }
         }        
         return radius;
     }
