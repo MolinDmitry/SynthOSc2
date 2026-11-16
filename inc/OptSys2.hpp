@@ -238,6 +238,7 @@ class OptSystem{
                 }
             if (ray1Exist && ray2Exist){
                 radius = fabs(dy1-dy2)/2;
+                
             }
         }        
         return radius;
