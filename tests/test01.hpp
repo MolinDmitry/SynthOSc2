@@ -62,8 +62,17 @@ namespace test01 {
     double dy = dx*tan(outputRay.getW());
     log("dy: " + std::to_string(dy));
     log("");
-    double geo_spot_radius = optSys.findSpotRadius(1, 5, false, USE_THIN_COMP, 6);
-    double rms_spot_radius = optSys.findSpotRadius(1, 5 , true, USE_THIN_COMP, 6);
+    log("Spot radius 0 deg");
+    int numRays = 6;
+    double geo_spot_radius = optSys.findSpotRadius(1, 0, false, USE_THIN_COMP, numRays);
+    double rms_spot_radius = optSys.findSpotRadius(1, 0 , true, USE_THIN_COMP, numRays);
+    log("GEO spot radius: " + std::to_string(geo_spot_radius));
+    log("RMS spot radius: " + std::to_string(rms_spot_radius)); 
+
+    log("");
+    log("Spot radius 5 deg");
+    geo_spot_radius = optSys.findSpotRadius(1, 5, false, USE_THIN_COMP, numRays);
+    rms_spot_radius = optSys.findSpotRadius(1, 5 , true, USE_THIN_COMP, numRays);
     log("GEO spot radius: " + std::to_string(geo_spot_radius));
     log("RMS spot radius: " + std::to_string(rms_spot_radius)); 
 

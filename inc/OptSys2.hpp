@@ -176,6 +176,7 @@ class OptSystem{
         if (numRays <= 1) return 0.0;
         if (numRays%2 != 0) numRays++; // для расчета по четному числу чтобы луч не проходил по центру зрачка
         // т.е. пятно от него будет 0, а в общем количестве он учитывается, уменьшая RMS при малых количествах лучей
+        if (numRays > 100) numRays = 100;
         // вычисляем положение фокальной плоскости
         Ray ray = Ray(1e-7, 0.0); // нулевой луч
         Ray outRay = this->passRayThroughtOS(ray, wvlIndex, thinComp);
@@ -196,7 +197,9 @@ class OptSystem{
         double curH = 0;
         if (RMS){
             int numPassedRays = 0;
-            for(int i = 0; i < numRays;i++){
+            double dy_arr[100];
+            double dy_med = 0;
+            for(int i = 0; i < numRays; i++){
                 curH = i*da - this->aperture/2;
                 ray = Ray(curH, curField);
                 outRay = this->passRayThroughtOS(ray, wvlIndex, thinComp);
@@ -204,12 +207,31 @@ class OptSystem{
                     double lastR = this->surfaceArray[this->surfaceCount-1].getR();
                     double dX = fabs(lastR) - sqrt(lastR*lastR - outRay.getH()*outRay.getH());
                     double xf = xFplane - dX*(lastR>=0 ? 1:-1);// координата фокальной плоскости в системе координат, связанной с точкой выхода луча после последней поверхности
-                    double dy = outRay.getH() + xf*tan(outRay.getW()) - y0;
+                    double dy = outRay.getH() + xf*tan(outRay.getW());
+                    dy_arr[i] = dy;
+                    dy_med += dy;
                     numPassedRays++;
-                    radius+=dy*dy;
+                    //radius+=dy*dy;
+                }
+                else{
+                    dy_arr[i] = 1e+7;
                 }
             }
-            radius = sqrt(radius/numPassedRays);
+            if (numPassedRays != 0){
+                dy_med = dy_med/numPassedRays;
+                // расчет среднеквадратического радиуса
+                radius = 0;
+                for(int i = 0; i < numRays; i++){
+                    if (dy_arr[i] < 0.9e+7){
+                        double delta = dy_arr[i] - dy_med;
+                        radius+= delta*delta;
+                    }
+                }
+                radius = sqrt(radius/numPassedRays);
+            }
+            else{
+                dy_med = 1e+7;
+            } 
         }
         else{
             double dy1 = 1e+6;
@@ -237,8 +259,7 @@ class OptSystem{
                     //radius =fabs(dy);
                 }
             if (ray1Exist && ray2Exist){
-                radius = fabs(dy1-dy2)/2;
-                
+                radius = fabs(dy1-dy2)/2;                
             }
         }        
         return radius;
